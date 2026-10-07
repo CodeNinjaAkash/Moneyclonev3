@@ -1,0 +1,29 @@
+name: Build APK
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unzip and find project
+        run: |
+          ls -la
+          Z=$(ls -t *.zip | head -1)
+          if [ -z "$Z" ]; then echo "No zip file in repo"; exit 1; fi
+          echo "Using $Z"
+          mkdir src
+          unzip -qo "$Z" -d src
+          S=$(find src -name settings.gradle.kts | head -1)
+          if [ -z "$S" ]; then echo "settings.gradle.kts not found"; find src | head -30; exit 1; fi
+          D=$(dirname "$S")
+          echo "PROJ=$D" >> $GITHUB_ENV
+          printf "android.useAndroidX=true\nandroid.nonTransitiveRClass=true\norg.gradle.jvmargs=-Xmx3g\n" > "$D/gradle.properties"
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: 8.7 }
+      - run: cd "$PROJ" && gradle assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MoneyClone-apk
+          path: ${{ env.PROJ }}/app/build/outputs/apk/debug/app-debug.apk
